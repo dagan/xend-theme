@@ -1,0 +1,24 @@
+<?php if (isset($this->title)) printf('<h1 class="title">%s</h1>', $this->title); ?>
+
+<?php if (isset($this->message)) printf('<p class="message">%s</p>', $this->message); ?>
+
+<?php if (isset($this->exception)) : ?>
+<h2>Exception Occurred: <?php echo get_class($this->exception) ?></h2>
+<table class="exception">
+    <tbody>
+        <tr>
+            <td>Message</td>
+            <td><?php printf('(%d) %s', $this->exception->getCode(), $this->exception->getMessage()); ?></td>
+        <tr>
+        <tr>
+            <td>Location</td>
+            <td><?php printf('In %s on line %d', $this->exception->getFile(), $this->exception->getLine()); ?></td>
+        <tr>
+        <tr>
+            <td>Stack</td>
+            <td><?php echo $this->exception->getStack(); ?></td>
+        <tr>
+    </tbody>
+</table>
+
+<?php endif; ?>

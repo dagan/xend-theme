@@ -1,0 +1,13 @@
+@import "variables";
+
+body {
+	padding-top: $navBarHeight;
+	
+	&.admin-bar .navbar-fixed-top {
+		top: 32px;
+	
+		@media screen and (max-width: 782px) {
+			top: 46px;
+		}
+	}
+}
