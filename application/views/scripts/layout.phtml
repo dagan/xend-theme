@@ -1,0 +1,57 @@
+<?php /* @var $this \Zend_View */ ?>
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <title><?php $this->wordpress()->blogInfo(); $this->wordpress()->title(); ?></title>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    	
+	    <?php echo $this->headLink(); // Print ZF-enqueued link tags ?>
+	    
+		<?php echo $this->headScript();	// Print ZF-enqueued scripts ?>
+		
+	    <?php echo $this->wordpress()->enqueueStyle('xend')->enqueueScript('bootstrap')->headAction(); // Do the WordPress 'head' action ?>
+    </head>
+    <body class="<?php echo $this->wordpress()->getBodyClass(); ?>">
+    	<nav class="navbar navbar-default navbar-fixed-top">
+    		<div class="container">
+    			<div class="navbar-header">
+    				<button type="button" class="navbar-toggle collapsed"
+    					data-toggle="collapse" data-target="#navbar" aria-expanded="false"
+    					aria-controls="navbar">
+    					<span class="sr-only">Toggle navigation</span> <span
+    						class="icon-bar"></span> <span class="icon-bar"></span> <span
+    						class="icon-bar"></span>
+    				</button>
+    				<a class="navbar-brand" href="/">Xend Theme</a>
+    			</div>
+    			<div id="navbar" class="collapse navbar-collapse">
+        			<?php 
+        			     $navMenu = new \Xend\WordPress\ViewHelper\Menu();
+        			     $navMenu->container = false;
+        			     $navMenu->menuClass = "nav navbar-nav";
+        			     echo str_replace("current-menu-item", "current-menu-item active", $this->wordpress()->renderMenu($navMenu, true));
+        			?>
+        			<form class="navbar-form navbar-right" role="search">
+                        <div class="form-group">
+                            <input type="text" name="s" class="form-control" placeholder="Search For &hellip;">
+                        </div>
+                        <button type="submit" class="btn btn-default">Search</button>
+                    </form>
+    			</div><!-- #navbar -->
+    		</div>
+    	</nav><!-- .navbar -->
+    	<header id="header">
+    	   <?php echo $this->layout()->header; ?>
+    	</header><!-- #header -->
+    	<div id="main" class="container">
+    	   <?php echo $this->layout()->content; ?> 
+        </div>
+        <footer id="footer">
+           <?php echo $this->layout()->footer; ?> 
+        </footer><!-- #footer -->
+        <?php $this->wordpress()->footerAction(); // Do the WordPress 'footer' action ?>
+        
+    </body>
+</html>

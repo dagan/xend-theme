@@ -1,0 +1,16 @@
+<?php 
+/* @var $this \Zend_View */ 
+
+if ($this->query instanceof \Xend\WordPress\Query\QueryInterface) : ?>
+       
+            <h2 id="comments">Comments <span class="badge"><?php echo $this->query->countComments(); ?></span></h2>
+            <?php if ($this->query->hasComments()) : foreach ($this->query->comments() as $comment) : ?>
+                <p><a href="<?php echo htmlspecialchars($comment->getTheAuthorUrl()); ?>" rel="external no-follow"><?php $comment->theAuthor(); ?></a></p>
+                <div>
+                    <?php $comment->theContent(); ?>
+                </div>
+            <?php endforeach; else : ?>
+                <p class="bg-info comments-status">There have not yet been any comments on this post.</p>
+            <?php endif; ?>
+
+<?php endif;

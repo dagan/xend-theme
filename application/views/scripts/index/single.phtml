@@ -1,0 +1,20 @@
+<?php /* @var $this Zend_View */ if ($this->query instanceof \Xend\WordPress\Query\QueryInterface) : ?>
+    
+    <?php foreach ($this->query->posts() as $post) : ?>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="page-header"><h1><?php $post->theTitle(); ?></h1></div>
+            <div class="text-muted">Authored by <span class="post-author"><?php $post->theAuthor(); ?></span></div>
+            <div class="content">
+                <?php $post->theContent(); ?>
+            </div>
+            <?php echo $this->partial('comments.phtml', array('query' => $this->query)); ?>
+        </div>
+        <div class="col-md-3 col-md-offset-1 hidden-xs hidden-sm">
+            <?php echo $this->partial('sidebar.phtml'); ?>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
+<?php endif; // $this->query instanceof \Xend\WordPress\Query\QueryInterface
+    
