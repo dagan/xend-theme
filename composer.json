@@ -1,0 +1,22 @@
+{
+    "name": "xend/xend_theme",
+    "description": "Xend Theme is a WordPress parent theme built on the ZendFramework 1.X MVC modules.",
+    "require": {
+        "zendframework/zendframework1": "1.*"
+    },
+    "require-dev": {
+    	"phpunit/phpunit": "4.*"
+    },
+    "autoload": {
+    	"psr-4":{
+    		"Xend\\": "Xend/"
+		} 
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dagan Henderson",
+            "email": "dagan@techdagan.com"
+        }
+    ]
+}
