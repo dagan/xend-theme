@@ -9,27 +9,144 @@ namespace Xend\Controller\Router\Route;
  */
 class WordPress implements \Zend_Controller_Router_Route_Interface
 {
-    public static function getInstance(\Zend_Config $config, \Zend_Controller_Dispatcher_Interface $dispatcher = null)
-    {
-        if (!isset($dispatcher))
-                $dispatcher = $config->dispatcher;
-        
-        return new static($config, $dispatcher);
+    public static function getInstance(\Zend_Config $config) {
+        $config   = $config->toArray();
+        $criteria = (array_key_exists('criteria', $config)) ? $config['criteria'] : array();
+        $params   = (array_key_exists('params', $config)) ? $config['params'] : array();
+        return new static($criteria, $params);
     }
+
+    protected $_criteria;
+    protected $_params;
     
-    protected $_defaultModule;
-    protected $_controllerClassPrefix;
-    protected $_controllerDir;
-    protected $_controllerCache = array();
-    
-    /**
-     * @var \Zend_Controller_Dispatcher_Interface
-     */
-    protected $_dispatcher;
-    
-    public function __construct(\Zend_Controller_Dispatcher_Interface $dispatcher)
+    public function __construct($criteria = array(), $params = array())
     {
-        $this->_dispatcher = $dispatcher;
+        if ($criteria instanceof \Zend_Config) {
+            $criteria = $criteria->toArray();
+        }
+        $this->setCriteria($criteria);
+
+        if ($params instanceof \Zend_Config) {
+            $params = array();
+        }
+        $this->setParams($params);
+    }
+
+    public function getCriteria() {
+        return $this->_criteria;
+    }
+
+    public function setCriteria(array $criteria) {
+        $this->_criteria = $criteria;
+        return $this;
+    }
+
+    public function getParams() {
+        return $this->_params;
+    }
+
+    public function setParams(array $params) {
+        $this->_params = $params;
+        return $this;
+    }
+
+    public function useModule($module) {
+        $this->_params['module'] = $module;
+        return $this;
+    }
+
+    public function useController($controller) {
+        $this->_params['controller'] = $controller;
+        return $this;
+    }
+
+    public function useAction($action) {
+        $this->_params['action'] = $action;
+        return $this;
+    }
+
+    public function useParams(array $params) {
+        $this->_params = array_merge($params, $this->_params);
+        return $this;
+    }
+
+    public function is404() {
+        $this->_criteria['error'] = '404';
+        return $this;
+    }
+
+    public function isAdmin() {
+        $this->_criteria['admin'] = true;
+        return $this;
+    }
+
+    public function isAttachment() {
+        $this->_criteria['single'] = 'attachment';
+        return $this;
+    }
+
+    public function isAuthor($author = true) {
+        $this->_criteria['author'] = $author;
+    }
+
+    public function isCategory($category = true) {
+        $this->_criteria['category'] = $category;
+        return $this;
+    }
+
+    public function isCommentsFeed() {
+        $this->_criteria['comment'] = 'feed';
+        return $this;
+    }
+
+    public function isCommentsPopup() {
+        $this->_criteria['comment'] = 'popup';
+        return $this;
+    }
+
+    public function isCustomPostTypeArchive($postType = true) {
+        $this->_criteria['archive'] = $postType;
+        return $this;
+    }
+
+    public function isDate($type = true) {
+        $this->_criteria['date'] = $type;
+        return $this;
+    }
+
+    public function isFeed($feed = true) {
+        $this->_criteria['feed'] = $feed;
+        return $this;
+    }
+
+    public function isFrontPage() {
+        $this->_criteria['index'] = 'front';
+        return $this;
+    }
+
+    public function isHome() {
+        $this->_criteria['index'] = 'home';
+        return $this;
+    }
+
+    public function isSearch($type = true) {
+        $this->_criteria['search'] = $type;
+        return $this;
+    }
+
+    public function isSingle($type = true) {
+        $this->_criteria['single'] = $type;
+        return $this;
+    }
+
+    public function isTag($tag = true) {
+        $this->_criteria['tag'] = $tag;
+        return $this;
+    }
+
+    public function isTaxonomy($taxonomy = true) {
+        $this->_criteria['taxonomy'] = $taxonomy;
+        return $this;
     }
 
     public function getVersion()
@@ -44,174 +161,23 @@ class WordPress implements \Zend_Controller_Router_Route_Interface
 
     public function match($request)
     {
-        // Verify the request is a WordPress query
-        if (!$request instanceof \Zend_Controller_Request_Http
-            || !$request->getParam("wordpressQuery", false) instanceof \Xend\WOrdPress\Query\QueryInterface) {
-                
+        $query = $request->getParam('wordpressQuery');
+        if (!$query instanceof \Xend\WordPress\Query) {
             return false;
         }
-        
-        // Initialize routing parameters
-        $this->_defaultModule         = $this->_dispatcher->getDefaultModule();
-        $this->_controllerDir         = $this->_dispatcher->getControllerDirectory($this->_defaultModule);
-        $this->_controllerClassPrefix = ($this->_dispatcher->getParam('prefixDefaultModule'))
-        								 ? ucfirst($this->_defaultModule) . '_'
-        								 : '';
 
-        // Determine the hierarchy based on the request
-        list($type, $subtype) = $request->getParam("wordpressQuery")->getQueryType(true);
-        $hierarchy = array(array('index', 'index'));
-        switch($type) {
-            case 'error' : // WordPress 404
-            	$hierarchy[] = array('index', 'error');
-                $hierarchy[] = array('error', 'error');
-                $hierarchy[] = array('error', 'error-' . $subtype);
-                
-            	// Add a ZF error handler for the error controller to recognize the 404
-            	$error = new \ArrayObject(array(), \ArrayObject::ARRAY_AS_PROPS);
-            	$error->type = \Zend_Controller_Plugin_ErrorHandler::EXCEPTION_NO_ROUTE;
-            	$error->exception = new \Zend_Controller_Router_Exception();
-            	$request->setParam('error_handler', $error);
-                break;
-            case 'comment':
-            	$hierarchy[] = array('index', 'comment');
-                $hierarchy[] = array('comment', 'index');
-                $hierarchy[] = array('comment', $subtype);
-                break;
-            case 'single':
-            	$hierarchy[] = array('index', 'single');
-                $hierarchy[] = array('index', $subtype);
-                $hierarchy[] = array($subtype, 'index');
-                $hierarchy[] = array($subtype, 'single');
-                break;
-            case 'archive':
-                $hierarchy[] = array('index', 'archive');
-                $hierarchy[] = array('index', $subtype . '-archive');
-                $hierarchy[] = array($subtype, 'index');
-                break;
-            case 'category':
-            	$hierarchy[] = array('index', 'category');
-                $hierarchy[] = array('taxonomy', 'index');
-                $hierarchy[] = array('taxonomy', 'category');
-                $hierarchy[] = array('category', 'index');
-                $hierarchy[] = array('category', $subtype);
-                break;
-            case 'tag':
-            	$hierarchy[] = array('index', 'tag');
-                $hierarchy[] = array('taxonomy', 'index');
-                $hierarchy[] = array('taxonomy', 'tag');
-                $hierarchy[] = array('tag', 'index');
-                $hierarchy[] = array('tag', $subtype);
-                break;
-            case 'taxonomy':
-            	$hierarchy[] = array('index', 'taxonomy');
-                $hierarchy[] = array('index', $subtype);
-                $hierarchy[] = array('taxonomy', 'index');
-                $hierarchy[] = array('taxonomy', $subtype);
-                break;
-            case 'author':
-            	$hierarchy[] = array('index', 'author');
-                $hierarchy[] = array('author', 'index');
-                $hierarchy[] = array('author', $subtype);
-                break;
-            case 'date':
-            	$hierarchy[] = array('index', 'date');
-                $hierarchy[] = array('date', 'index');
-                $hierarchy[] = array('date', $subtype);
-                break;
-            case 'comment':
-            	$hierarchy[] = array('index', 'comment');
-            	$hierarchy[] = array('index', 'comment-' . $subtype);
-                $hierarchy[] = array('comment', 'index');
-                $hierarchy[] = array('comment', $subtype);
-                break;
-            case 'search':
-            	$hierarchy[] = array('index', 'search');
-                $hierarchy[] = array('search', 'index');
-                $hierarchy[] = array('search', $subtype);
-                $hierarchy[] = array($subtype, 'search');
-                break;
-            default:
-            	$hierarchy[] = array('index', $type);
-                $hierarchy[] = array($type, $subtype);
-        }
+        list($type, $subtype) = $query->getQueryType(true);
 
-        // Find the best dispatchable match in the child theme (if one exists)
-        foreach (array_reverse($hierarchy) as $route) {
-            
-        	list($controller, $action) = $route;
-            $controllerClass = $this->_getControllerClassName($controller);
-            $actionName      = $this->_getActionName($action);
-            
-            if ($this->_isDispatchable($controllerClass, $actionName)) {
-                return array('controller' => $controller, 'action' => $action);
-            }
-        }
-
-        // Fallback to the Index controller and index action
-        return array('module' => 'xend', 'controller' => 'index', 'action' => 'index');
-    }
-
-    protected function _getControllerClassName($controller)
-    {
-        return $this->_controllerClassPrefix . ucfirst($this->_formatName($controller)) . 'Controller';
-    }
-
-    protected function _getActionName($action)
-    {
-        return $this->_formatName($action) . 'Action';
-    }
-
-    protected function _formatName($name)
-    {
-    	// Decapitalized & replace non-word characters with undersocrds
-    	$name = preg_replace('/\\W/', '', strtolower($name));
-    	
-    	// Capitalize letters following underscores and remove the preceding underscore
-    	$name = preg_replace_callback('/_([a-z])/', function ($matches) { return strtoupper($matches[1]); }, $name);
-    	
-    	// Remove any remaining underscores
-    	$name = str_replace('_', '', $name);
-    	
-    	return $name;
-    }
-
-    /**
-     * Determines if the Given Controller Action is Dispatchable
-     *
-     * @param string $controllerClass
-     * @param string $actionName
-     * @return bool True if dispatchable. False if not.
-     */
-    protected function _isDispatchable($controllerClass, $actionMethod)
-    {
-        if (!array_key_exists($controllerClass, $this->_controllerCache)) {
-        	
-        	// Instantiate an empty array for the class name
-        	$this->_controllerCache[$controllerClass] = array();
-        	
-            // Attempt to load the controller class
-            $controllerFile = substr($controllerClass, strlen($this->_controllerClassPrefix)) . '.php';
-            $controllerPath = $this->_controllerDir . '/' . $controllerFile;
-            if (is_readable($controllerPath)) {
-                include_once($controllerPath);
-            } else {
+        foreach ($this->getCriteria() as $requiredType => $requiredSubtype) {
+            if ($type !== $requiredType) {
                 return false;
             }
 
-            // Use reflection to confirm the class implements the Action Interface and retrieve an array of methods 
-            if (class_exists($controllerClass)) {
-                $reflection = new \ReflectionClass($controllerClass);
-                $this->_controllerCache[$controllerClass] = array();
-                if ($reflection->implementsInterface('Zend_Controller_Action_Interface')) {
-	                foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-	                	$this->_controllerCache[$controllerClass][] = $method->name;
-	                }
-                }
+            if ($requiredSubtype !== true && $subtype !== $requiredSubtype) {
+                return false;
             }
         }
 
-        // If the action method exists, the route is dispatchable
-		return in_array($actionMethod, $this->_controllerCache[$controllerClass]);
+        return $this->getParams();
     }
 }
