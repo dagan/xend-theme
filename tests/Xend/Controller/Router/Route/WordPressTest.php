@@ -9,74 +9,221 @@ namespace Xend\Tests\Controller\Router\Route;
  */
 class WordPressTest extends \PHPUnit_Framework_TestCase
 {
-	/**
-	 * Data Provider for Modules
-	 * 
-	 * Parses the TestModules directory for test cases. Each directory is taken
-	 * as a module's controller directory and the directory name is used as the
-	 * module name. Test cases are provided via a testCases array defined in
-	 * provider.php file inside the directory.
-	 * 
-	 * @return array
-	 */
-	public function matchProvider()
-	{
-		$tests = array();
-
-		$modules = opendir(dirname(__FILE__) . '/TestModules');
-		while ($module = readdir($modules)) {
-			if (in_array($module, array('.', '..'))) {
-				continue;
-			}
-			
-			$path = dirname(__FILE__) . '/TestModules/' . $module;
-			include($path . '/provider.php');
-			
-			$i = 0;
-			foreach ($testCases as $testCase) {
-				$key = sprintf('%s[%d]', $module, $i++);
-				$tests[$key] = array_merge(array($module, $path), $testCase);
-			}
-		}
-		
-		return $tests;
+	public function routeDataProvider() {
+		return array(
+			array(
+				'single',
+				'post',
+				array('single' => true),
+				array('module' => 'xend', 'controller' => 'index', 'action' => 'index')),
+			array(
+				'single',
+				'post',
+				array('single' => 'post'),
+				array('module' => 'xend', 'controller' => 'index', 'action' => 'post')),
+			array(
+				'single',
+				'page',
+				array('single' => 'page'),
+				array('module' => 'xend', 'controller' => 'index', 'action' => 'page')),
+		);
 	}
 
 	/**
-	 * @dataProvider matchProvider
+	 * @dataProvider routeDataProvider
 	 */
-	public function testMatch($module, $controllerDir, $queryType, $querySubType, $expectedController, $expectedAction)
-	{
-		// Set up a query object with the provided query type and subtype
-		$query = $this->getMock('\Xend\WordPress\Query', array('getQueryType'));
+	public function testMatch($queryType, $querySubtype, $criteria, $params) {
+
+		$query = $this->getMockBuilder('Xend\\WordPress\\Query')->disableOriginalConstructor()->getMock();
 		$query->expects($this->once())
 			  ->method('getQueryType')
-			  ->with(true)
-			  ->will($this->returnValue(array(
-			  		$queryType,
-			  		$querySubType,
-			  		'type' => $queryType,
-			  		'subtype' => $querySubType)));
-			  
-		// Set up a request object using the query
-		$request = new \Xend\Controller\Request($query);
-		
-		// Create a dispatcher, add the test module, and set the default module
-		$dispatcher = new \Zend_Controller_Dispatcher_Standard();
-		$dispatcher->setControllerDirectory($controllerDir, $module);
-		$dispatcher->setDefaultModule($module);
-		$dispatcher->setParam('prefixDefaultModule', true); // Necessary to namespace the test groups
-		
-		// Match the request
-		$fixture = new \Xend\Controller\Router\Route\WordPress($dispatcher);
-		$params = $fixture->match($request);
-		
-		// Test the result
-		$this->assertTrue(is_array($params), 'The request did not match the route!');
-		$this->assertArrayNotHasKey('module', $params, 'The request was expected to route to the default module but did not');
-		$this->assertArrayHasKey('controller', $params);
-		$this->assertEquals($expectedController, $params['controller'], 'The routed controller did not match the expected module');
-		$this->assertArrayHasKey('action', $params);
-		$this->assertEquals($expectedAction, $params['action'], 'The routed action did not match the expected module'); 
-	}    
+			  ->with($this->equalTo(true))
+			  ->willReturn(array($queryType, $querySubtype));
+
+		$request = new \Zend_Controller_Request_Http();
+		$request->setParam('wordpressQuery', $query);
+
+		$fixture = new \Xend\Controller\Router\Route\WordPress($criteria, $params);
+		$this->assertEquals($params, $fixture->match($request));
+	}
+
+	public function testUseModule() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->useModule('xend');
+		$params = $fixture->getParams();
+		$this->assertEquals('xend', $params['module']);
+	}
+
+	public function testUseController() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->useController('my-controller');
+		$params = $fixture->getParams();
+		$this->assertEquals('my-controller', $params['controller']);
+	}
+
+	public function testUseAction() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->useAction('my-action');
+		$params = $fixture->getParams();
+		$this->assertEquals('my-action', $params['action']);
+	}
+
+	public function testUseParams() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+
+		$fixture->setParams(array('controller' => 'my-controller', 'action' => 'my-action'));
+		$fixture->useParams(array('someKey' => 'someValue'));
+		$this->assertEquals(
+			array('someKey' => 'someValue', 'controller' => 'my-controller', 'action' => 'my-action'),
+			$fixture->getParams());
+
+	}
+
+	public function testIs404() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->is404();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('404', $criteria['error']);
+	}
+
+	public function testIsAdmin() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isAdmin();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['admin']);
+	}
+
+	public function testIsAttachment() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isAttachment();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('attachment', $criteria['single']);
+	}
+
+	public function testIsAuthor($author = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isAuthor();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['author']);
+
+		$fixture->isAuthor(52);
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(52, $criteria['author']);
+	}
+
+	public function testIsCategory($category = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isCategory();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['category']);
+
+		$fixture->isCategory('my-category');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-category', $criteria['category']);
+	}
+
+	public function testIsCommentsFeed() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isCommentsFeed();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('feed', $criteria['comment']);
+	}
+
+	public function testIsCommentsPopup() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isCommentsPopup();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('popup', $criteria['comment']);
+	}
+
+	public function testIsCustomPostTypeArchive($postType = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isCustomPostTypeArchive();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['archive']);
+
+		$fixture->isCustomPostTypeArchive('my-post-type');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-post-type', $criteria['archive']);
+	}
+
+	public function testIsDate($type = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isDate();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['date']);
+
+		$fixture->isDate('year');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('year', $criteria['date']);
+	}
+
+	public function testIsFeed($feed = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isFeed();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['feed']);
+
+		$fixture->isFeed('my-post-type');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-post-type', $criteria['feed']);
+	}
+
+	public function testIsFrontPage() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isFrontPage();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('front', $criteria['index']);
+	}
+
+	public function testIsHome() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isHome();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('home', $criteria['index']);
+	}
+
+	public function testIsSearch() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isSearch();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['search']);
+
+		$fixture->isSearch('my-post-type');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-post-type', $criteria['search']);
+	}
+
+	public function testIsSingle() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isSingle();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['single']);
+
+		$fixture->isSingle('my-post-type');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-post-type', $criteria['single']);
+	}
+
+	public function testIsTag() {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isTag();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['tag']);
+
+		$fixture->isTag('my-tag');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-tag', $criteria['tag']);
+	}
+
+	public function isTaxonomy($taxonomy = true) {
+		$fixture = new \Xend\Controller\Router\Route\WordPress();
+		$fixture->isTaxonomy();
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals(true, $criteria['tag']);
+
+		$fixture->isTaxonomy('my-tax');
+		$criteria = $fixture->getCriteria();
+		$this->assertEquals('my-tax', $criteria['taxonomy']);
+	}
 }

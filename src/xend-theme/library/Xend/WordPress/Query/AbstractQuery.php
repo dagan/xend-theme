@@ -188,7 +188,7 @@ abstract class AbstractQuery implements QueryInterface {
         // Authors
         else if ($this->isAuthor()) {
             $type = 'author';
-            $subtype = sprintf('user-%d', $this->getQueriedObject()->id);
+            $subtype = $this->getQueriedObject()->id;
         }
 
         // Dates
@@ -223,23 +223,18 @@ abstract class AbstractQuery implements QueryInterface {
         // Feeds
         else if ($this->isFeed()) {
             $feed = $this->get('feed');
-            if ('feed' == $feed)
-                    $feed = get_default_feed();
+            if ('feed' == $feed) {
+                $feed = get_default_feed();
+            }
 
             $post_type = $this->get('post_type');
-            if (empty($post_type)) {
-                $type = 'feed';
-                $subtype = $feed;
-            } else {
-                $type = $post_type;
-                $subtype = $feed;
-            }
+            $subtype = (empty($post_type)) ? 'feed' : $post_type;
         }
 
         // All other Archives
         else {
             $type = 'archive';
-            $subtype = 'index';
+            $subtype = $this->getQueriedObject()->slug;
         }
 
         return ($include_subtype) ? array($type, $subtype, 'type' => $type, 'subtype' => $subtype) : $type;
