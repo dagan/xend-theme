@@ -8,44 +8,60 @@ use Xend\WordPress;
  */
 class Bootstrap extends \Zend_Application_Bootstrap_Bootstrap
 {
-
     protected function _initAutoloader() {
-        $this->getApplication()->getAutoloader()->registerNamespace('Xend', __DIR__ . '/library/Xend');
+        \Zend_Loader_Autoloader::getInstance()->registerNamespace('XendTheme');
     }
 
-    protected function _initChildTheme()
-    {
-        $this->bootstrap('Autoloader');
-        $fc = $this->bootstrap('FrontController')->getResource('FrontController');
-        $fc->addControllerDirectory(__DIR__ . '/application/controllers', 'xend');
+    protected function _initCommentForms() {
+        $wordpress = $this->bootstrap(array('Autoloader', 'WordPress'))->getResource('WordPress');
 
-        if (function_exists('xend_child') && ($options = xend_child()) instanceof \Xend\Options) {
-
-            $dir = rtrim($options->getChildDirectory(), '/\\');
-            if (!is_dir($dir)) {
-                throw new Exception('Child theme definition must be a valid directory path');
-            }
-
-            // Add the child theme module
-            $fc->addControllerDirectory($dir . '/controllers', $options->getChildModuleName());
-            $fc->setDefaultModule($options->getChildModuleName());
-
-            // Make sure modules are loaded
-            $this->registerPluginResource('Modules');
-            $this->bootstrap('Modules');
-
-            return $options;
+        if (get_option("require_name_email")) {
+            $requiredLabel = '<span class="required">*</span>';
+            $requiredAria = ' aria-required="true" ';
         } else {
-            $fc->setDefaultModule('xend')
-               ->setParam('prefixDefaultModule', true);
+            $requiredLabel = '';
+            $requiredAria = '';
         }
+
+        $commentForm = new \Xend\WordPress\ViewHelper\CommentForm();
+        $commentForm->format = 'html5';
+        $commentForm->fields = array(
+                'author' => '<div class="comment-form-author form-group">' .
+                                '<label for="author">' . __('Name') . $requiredLabel . '</label>' .
+                                '<input id="author" class="form-control" name="author" type="text"' . $requiredAria . '/>' .
+                            '</div>',
+                'email'  => '<div class="comment-form-email form-group">' .
+                                '<label for="email">' . __('Email') . $requiredLabel . '</label>' .
+                                '<input id="email" class="form-control" name="email" type="email" aria-describedby="email-notes"' . $requiredAria . '/>' .
+                            '</div>',
+                'url' => '<div class="comment-form-url form-group">' .
+                             '<label for="url">' . __('Website') . '</label>' .
+                             '<input id="url" class="form-control" name="url" type="url"/>' .
+                         '</div>',
+        );
+        $commentForm->commentField = '<div class="comment-form-comment form-group">' .
+                                         '<label for="comment">' . _x('Comment', 'noun') . '</label>' .
+                                         '<textarea id="comment" class="form-control" name="comment" rows="6" aria-describedby="form-allowed-tags" aria-required="true"></textarea>' .
+                                     '</div>';
+        // $commentForm->afterMessage = '<p class="form-allowed-tags help-block col-sm-offset-2" id="form-allowed-tags">' . sprintf( __( 'You may use these <abbr title="HyperText Markup Language">HTML</abbr> tags and attributes: %s' ), ' <code>' . allowed_tags() . '</code>' ) . '</p>';
+        $commentForm->submitClass = 'btn btn-primary';
+
+        $wordpress->viewHelper()->registerCommentForm($commentForm, 'xend-theme');
+        $wordpress->viewHelper()->setDefaultCommentForm('xend-theme');
+    }
+
+    protected function _initCommentLists() {
+        $wordpress = $this->bootstrap(array('Autoloader', 'WordPress'))->getResource('WordPress');
+        $commentList = new \Xend\WordPress\ViewHelper\CommentList(array('format' => 'html5', 'style' => 'div'));
+        $wordpress->viewHelper()->registerCommentList($commentList, 'xend-theme');
+        $wordpress->viewHelper()->setDefaultCommentList('xend-theme');
     }
     
     protected function _initErrorHandler() {
-        // Use xend over default module for errors
-        $frontController = $this->bootstrap('FrontController')->getResource('FrontController'); /* @var $frontController \Zend_Controller_Front */
+        // Explicitly use xend-theme for error handling
+        $frontController = $this->bootstrap('FrontController')->getResource('FrontController');
         $errorHandler = new Zend_Controller_Plugin_ErrorHandler();
-        $errorHandler->setErrorHandlerModule('xend');
+        $errorHandler->setErrorHandlerModule('xend-theme');
         $frontController->registerPlugin($errorHandler, 100);
         
         return $errorHandler;
@@ -53,54 +69,41 @@ class Bootstrap extends \Zend_Application_Bootstrap_Bootstrap
     
     protected function _initLayout()
     {
-
-        $this->bootstrap(array('Autoloader', 'ChildTheme', 'WordPress'));
-        $wordpress = $this->getResource('WordPress');
-        /* @var $wordpress \Xend\WordPress */
-        $child = $this->getResource('ChildTheme');
-        /* @var $child \Xend\Options */
+        $this->bootstrap(array('Autoloader', 'Theme', 'WordPress'));
+        $wordpress = $this->getResource('WordPress'); /* @var $wordpress \Xend\WordPress */
+        $theme = $this->getResource('Theme'); /* @var $theme \XendTheme\Options */
 
         // Register Navigation Menu Locations
-        if (is_null($child) || $child->registerDefaultMenu()) {
+        if ($theme->registerDefaultMenu()) {
             $wordpress->elements()->registerMenuLocation('xend_primary', 'Primary Navigation Menu');
         }
 
         // Register a Sidebar
-        if (is_null($child) || $child->registerDefaultSidebar()) {
-            $wordpress->elements()->registerSidebar(new \Xend\WordPress\Elements\Sidebar('Primary Sidebar', 'This is the primary sidebar.'));
+        if ($theme->registerDefaultSidebar()) {
+            $defaultSidebar = new \Xend\WordPress\Elements\Sidebar('Primary Sidebar', 'This is the primary sidebar.');
+            $wordpress->elements()->registerSidebar($defaultSidebar);
         }
 
         $viewHelper = $wordpress->viewHelper();
 
         // Register Stylesheets
-        $viewHelper->registerStyle('bootstrap',
-            '//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css');
-        $viewHelper->registerStyle('bootstrap-theme',
-            '//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css', array('bootstrap'));
-        $viewHelper->registerStyle('xend',
-            sprintf('%s/css/main.css', $viewHelper->getXendUri()), array('bootstrap', 'bootstrap-theme'));
+        $viewHelper->registerStyle('bootstrap-theme', '//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css');
+        $viewHelper->registerStyle('xend-theme', $viewHelper->getThemeUri()  . '/css/main.css', array('bootstrap-theme'));
 
         // Register Scripts
-        $viewHelper->registerScript(
-            'bootstrap',
-            '//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js',
-            array('jquery'),
-            '3.3.1',
-            true);
+        $viewHelper->registerScript('bootstrap', $viewHelper->getThemeUri() . '/js/bootstrap.min.js', array('jquery'), '3.3.1', true);
 
 
         $layout = \Zend_Layout::startMvc();
         $view = $layout->getView();
 
         // Set the Xend view directory explicitly, giving child themes a chance to override
-        $view->addBasePath(realpath('./application/views'), 'Xend_');
+        $view->addBasePath(realpath('./application/views'), 'XendTheme_');
 
         // Register the child viewBasePath
-        if (!is_null($child)) {
-            $childBasePath = $child->getViewBasePath();
-            if ($childBasePath !== false) {
-                $view->addBasePath($childBasePath);
-            }
+        $childBasePath = $theme->getViewBasePath();
+        if ($childBasePath !== false) {
+            $view->addBasePath($childBasePath);
         }
         
         // Register the WordPress view helper
@@ -125,22 +128,61 @@ class Bootstrap extends \Zend_Application_Bootstrap_Bootstrap
 
     protected function _initRoutes()
     {
-        $this->bootstrap('Autoloader');
-        $frontController = $this->bootstrap('FrontController')->getResource('FrontController');
-        $dispatcher = $frontController->getDispatcher();
         $this->registerPluginResource('Router');
-        $router = $this->bootstrap('Router')->getResource('Router');
-        $router->addRoute('default', new \Xend\Controller\Router\Route\WordPress(
-            array(), array('module' => 'xend', 'controller' => 'index', 'action' => 'index')));
-        $router->addRoute('single', new \Xend\Controller\Router\Route\WordPress(
-            array('single' => true), array('module' => 'xend', 'controller' => 'index', 'action' => 'single')));
+        $this->bootstrap(array('Autoloader', 'Router'));
+        $router = $this->getResource('Router'); /* @var \Zend_Controller_Router_Rewrite $router */
+
+        $router->addRoute(
+            'default',
+            new \Zend_Controller_Router_Route(
+                '',
+                array('module' => 'xend-theme', 'controller' => 'index', 'action' => 'index')
+            ));
+
+        $router->addRoute(
+            'single',
+            new \XendTheme\Controller\Router\Route\WordPress(
+                array('single' => true),
+                array('module' => 'xend-theme', 'controller' => 'index', 'action' => 'single')
+            ));
+    }
+
+    protected function _initTheme()
+    {
+        $this->bootstrap('Autoloader', 'FrontController', 'Routes');
+        $frontController = $this->getResource('FrontController');
+
+        $frontController->addControllerDirectory(__DIR__ . '/application/controllers', 'xend-theme');
+
+        if (function_exists('xend_child') && ($options = xend_child()) instanceof \XendTheme\Options) {
+
+            $dir = rtrim($options->getChildDirectory(), '/\\');
+            if (!is_dir($dir)) {
+                throw new Exception('Child theme definition must be a valid directory path');
+            }
+
+            // Add the child theme module
+            $frontController->addControllerDirectory($dir . '/controllers', $options->getChildModuleName());
+            $frontController->setDefaultModule($options->getChildModuleName());
+
+            // Bootstrap the child theme
+            $this->registerPluginResource('Modules');
+            $this->bootstrap('Modules');
+
+        } else {
+            $frontController->setDefaultModule('xend-theme')
+               ->setParam('prefixDefaultModule', true);
+            $options = new \XendTheme\Options(false);
+        }
+
+        return $options;
     }
     
     protected function _initWordPress()
     {
-        $this->bootstrap('Autoloader');
-        $frontController = $this->bootstrap('FrontController')->getResource('FrontController');
-        $wordpress = new \Xend\WordPress($frontController);
+        $this->bootstrap(array('Autoloader', 'FrontController'));
+        $wordpress = $this->getApplication()->getOption('xend');
+        $frontController = $this->getResource('FrontController');
         $frontController->setParam('wordpress', $wordpress);
         return $wordpress;
     }

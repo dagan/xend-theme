@@ -5,7 +5,7 @@
  *
  * @author Dagan
  */
-class Xend_IndexController extends \Xend\Controller\Action
+class XendTheme_IndexController extends \XendTheme\Controller\Action
 {    
     public function indexAction()
     {

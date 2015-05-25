@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Xend Theme" default="build-all">
+
+    <property name="build.dir" value="build" />
+    <property name="scss.map" value="none" />
+
+    <target name="clean-xend">
+        <!-- Clean any existing build output -->
+        <delete dir="${build.dir}/xend-theme" />
+    </target>
+
+    <target name="build-xend" depends="clean-xend">
+        <!-- Copy Xend Theme -->
+        <copy toDir="${build.dir}/xend-theme">
+            <fileset dir="src/xend-theme" />
+        </copy>
+
+        <!-- Compile SCSS -->
+        <mkdir dir="${build.dir}/xend-theme/css" />
+        <exec executable="scss">
+            <arg value="--no-cache" />
+            <arg value="--sourcemap=${scss.map}" />
+            <arg value="-I" />
+            <arg value="vendor/twbs/bootstrap-sass/assets/stylesheets" />
+            <arg value="--update" />
+            <arg value="${basedir}/src/xend-theme/application/views/scss:${build.dir}/xend-theme/css" />
+        </exec>
+
+        <!-- Copy Bootstrap Assets -->
+        <copy todir="${build.dir}/xend-theme/js">
+            <fileset dir="vendor/twbs/bootstrap-sass/assets/javascripts" />
+        </copy>
+        <copy todir="${build.dir}/xend-theme/fonts">
+            <fileset dir="vendor/twbs/bootstrap-sass/assets/fonts" />
+        </copy>
+
+        <!-- Copy PHP Dependencies -->
+        <copy todir="${build.dir}/xend-theme/library/Xend">
+            <fileset dir="vendor/xend/xend/src" />
+        </copy>
+        <copy todir="${build.dir}/xend-theme/library/Zend">
+            <fileset dir="vendor/zendframework/zendframework1/library/Zend" />
+        </copy>
+
+    </target>
+
+    <target name="clean-xend-child">
+        <delete dir="${build.dir}/xend-child" />
+    </target>
+
+    <target name="build-xend-child" depends="clean-xend-child">
+        <copy todir="${build.dir}/xend-child">
+            <fileset dir="src/sample-child" />
+        </copy>
+    </target>
+
+    <target name="build-all" depends="build-xend, build-xend-child" />
+</project>

@@ -5,7 +5,7 @@
  *
  * @author Dagan
  */
-class Xend_ErrorController extends \Xend\Controller\Action
+class XendTheme_ErrorController extends \XendTheme\Controller\Action
 {
     public function errorAction()
     {

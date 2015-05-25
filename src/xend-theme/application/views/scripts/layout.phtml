@@ -11,7 +11,7 @@
 	    
 		<?php echo $this->headScript();	// Print ZF-enqueued scripts ?>
 		
-	    <?php echo $this->wordpress()->enqueueStyle('xend')->enqueueScript('bootstrap')->headAction(); // Do the WordPress 'head' action ?>
+	    <?php echo $this->wordpress()->enqueueStyle('xend-theme')->enqueueScript('bootstrap')->headAction(); // Do the WordPress 'head' action ?>
     </head>
     <body class="<?php echo $this->wordpress()->getBodyClass(); ?>">
     	<nav class="navbar navbar-default navbar-fixed-top">
@@ -31,6 +31,7 @@
         			     $navMenu = new \Xend\WordPress\ViewHelper\Menu();
         			     $navMenu->container = false;
         			     $navMenu->menuClass = "nav navbar-nav";
+                         $navMenu->maxDepth = 1;
         			     echo str_replace("current-menu-item", "current-menu-item active", $this->wordpress()->renderMenu($navMenu, true));
         			?>
         			<form class="navbar-form navbar-right" role="search">
